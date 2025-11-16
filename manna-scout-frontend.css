@@ -1,0 +1,215 @@
+.manna-scout{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff}
+.ms-tab-list{display:flex;gap:4px;overflow:auto;border-bottom:1px solid #e5e7eb;background:#f9fafb}
+.ms-tab{appearance:none;background:none;border:0;padding:12px 16px;cursor:pointer;font-weight:600;color:#374151;white-space:nowrap}
+.ms-tab.active{border-bottom:3px solid #2563eb;color:#111827}
+.ms-tab-panels{padding:16px}
+.ms-panel{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:flex-start}
+.ms-photo img{max-width:100%;height:auto;border-radius:8px;display:block}
+.ms-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
+.ms-name{margin:0;font-size:1.25rem}
+.ms-type{background:#eef2ff;color:#3730a3;border-radius:999px;padding:4px 10px;font-size:.8rem}
+.ms-description{color:#374151;line-height:1.55}
+.ms-terpenes{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.ms-pill{background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;border-radius:999px;padding:4px 10px;font-size:.8rem}
+.ms-effects{margin-top:12px;display:grid;gap:10px}
+.ms-effect{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center}
+.ms-effect-label{font-size:.9rem;color:#374151}
+.ms-effect-bar{position:relative;height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.ms-effect-fill{position:absolute;left:0;top:0;bottom:0;background:#2563eb}
+.ms-effect-value{position:absolute;right:8px;top:-18px;font-size:.8rem;color:#111827}
+.manna-scout-empty{padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px}
+
+@media (max-width:900px){
+  .ms-panel{grid-template-columns:1fr}
+}
+
+.manna-scout {
+  /* Site-brand colors (override these in your theme if desired) */
+  --ms-brand-primary: #539D4D; /* Primary */
+  --ms-brand-secondary: #FFFFFF; /* Secondary */
+  --ms-brand-text: #111111; /* Text */
+  --ms-brand-accent: #F6E982; /* Accent */
+
+  /* Component palette (dark surface for contrast) */
+  --ms-accent: var(--ms-brand-primary);
+  --ms-bg: #0b0f14;
+  --ms-surface: #0f1720;
+  --ms-text: #f3f4f6;
+  --ms-muted: #a1a1aa;
+}
+
+.manna-scout .ms-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.manna-scout .ms-tab {
+  background: var(--ms-surface);
+  color: var(--ms-text);
+  border: 1px solid #1f2937;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.manna-scout .ms-tab.active {
+  background: var(--ms-accent);
+  color: white;
+  border-color: var(--ms-accent);
+}
+
+.manna-scout .ms-tab-panels .ms-tab-panel {
+  display: none;
+}
+
+.manna-scout .ms-tab-panels .ms-tab-panel.active {
+  display: block;
+}
+
+.manna-scout .ms-panel {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  background: var(--ms-surface);
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+@media (max-width: 720px) {
+  .manna-scout .ms-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.manna-scout .ms-photo img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.manna-scout .ms-gallery {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manna-scout .ms-gallery .ms-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #1f2937;
+  cursor: pointer;
+}
+
+.manna-scout .ms-gallery .ms-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.manna-scout .ms-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.manna-scout .ms-name {
+  margin: 0;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  font-weight: 800;
+}
+
+.manna-scout .ms-type {
+  display: inline-block;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: white;
+  margin-right: 6px;
+}
+
+.manna-scout .ms-type--indica { background: #7c3aed; }
+.manna-scout .ms-type--sativa { background: #f59e0b; }
+.manna-scout .ms-type--hybrid { background: var(--ms-accent); }
+
+.manna-scout .ms-badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #111827;
+  color: var(--ms-text);
+  border: 1px solid #1f2937;
+}
+
+.manna-scout .ms-description {
+  color: var(--ms-text);
+}
+
+.manna-scout .ms-terpenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 6px 0;
+}
+
+.manna-scout .ms-pill {
+  background: #111827;
+  color: var(--ms-text);
+  border: 1px solid #1f2937;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.manna-scout .ms-effects {
+  display: grid;
+  gap: 10px;
+}
+
+.manna-scout .ms-effect-label {
+  font-size: 12px;
+  color: var(--ms-muted);
+}
+
+.manna-scout .ms-effect-bar {
+  position: relative;
+  height: 10px;
+  background: #0b1220;
+  border: 1px solid #1f2937;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.manna-scout .ms-effect-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--ms-accent), var(--ms-brand-accent));
+}
+
+.manna-scout .ms-effect-value {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ms-text);
+}
+
+.manna-scout-empty {
+  color: #6b7280;
+  font-style: italic;
+}
+
+
