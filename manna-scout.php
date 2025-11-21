@@ -12,6 +12,7 @@ if (!defined('ABSPATH')) {
 
 // Constants
 define('MANNA_SCOUT_OPTION_KEY', 'manna_scout_strains');
+define('MANNA_SCOUT_SETTINGS_KEY', 'manna_scout_settings');
 define('MANNA_SCOUT_PLUGIN_FILE', __FILE__);
 define('MANNA_SCOUT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -71,6 +72,7 @@ add_action('admin_menu', function () {
     // Top-level points to Add Strain
     add_submenu_page('manna-scout', 'Add Strain', 'Add Strain', 'manage_options', 'manna-scout', 'manna_scout_add_page');
     add_submenu_page('manna-scout', 'All Strains', 'All Strains', 'manage_options', 'manna-scout-all', 'manna_scout_list_page');
+    add_submenu_page('manna-scout', 'Settings', 'Settings', 'manage_options', 'manna-scout-settings', 'manna_scout_settings_page');
 });
 
 // Admin Assets
@@ -89,6 +91,16 @@ add_action('admin_init', function () {
         return;
     }
 
+    // Handle settings save (before checking manna_scout_action)
+    if (isset($_POST['ms_save_settings']) && isset($_POST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'manna_scout_settings')) {
+        $logo_url = isset($_POST['ms_logo_url']) ? esc_url_raw(wp_unslash($_POST['ms_logo_url'])) : '';
+        $settings = get_option(MANNA_SCOUT_SETTINGS_KEY, []);
+        $settings['logo_url'] = $logo_url;
+        update_option(MANNA_SCOUT_SETTINGS_KEY, $settings);
+        add_settings_error('manna_scout', 'settings_saved', 'Settings saved.', 'updated');
+        return;
+    }
+
     if (!isset($_POST['manna_scout_action'])) {
         // Handle GET delete on Add or All pages
         if (isset($_GET['page']) && in_array($_GET['page'], ['manna-scout', 'manna-scout-all'], true) && isset($_GET['ms_action']) && $_GET['ms_action'] === 'delete') {
@@ -102,6 +114,26 @@ add_action('admin_init', function () {
                 wp_safe_redirect(add_query_arg(['page' => 'manna-scout-all'], admin_url('admin.php')));
                 exit;
             }
+        }
+        // Handle bulk edit for show_in_slider
+        if (isset($_GET['page']) && $_GET['page'] === 'manna-scout-all' && isset($_GET['ms_action']) && $_GET['ms_action'] === 'bulk_edit_slider') {
+            check_admin_referer('manna_scout_bulk_edit');
+            $slugs = isset($_GET['slugs']) ? array_map('sanitize_title', explode(',', wp_unslash($_GET['slugs']))) : [];
+            $value = isset($_GET['value']) && $_GET['value'] === '1' ? true : false;
+            $strains = manna_scout_get_all_strains();
+            $updated = 0;
+            foreach ($slugs as $slug) {
+                if (isset($strains[$slug])) {
+                    $strains[$slug]['show_in_slider'] = $value;
+                    $updated++;
+                }
+            }
+            if ($updated > 0) {
+                manna_scout_save_strains($strains);
+                add_settings_error('manna_scout', 'bulk_updated', sprintf('%d strain(s) updated.', $updated), 'updated');
+            }
+            wp_safe_redirect(add_query_arg(['page' => 'manna-scout-all'], admin_url('admin.php')));
+            exit;
         }
         return;
     }
@@ -147,6 +179,8 @@ add_action('admin_init', function () {
             $effects[$ekey] = $val;
         }
 
+        $show_in_slider = isset($_POST['ms_show_in_slider']) && $_POST['ms_show_in_slider'] === '1' ? true : false;
+
         if ($name === '') {
             add_settings_error('manna_scout', 'missing_name', 'Name is required.', 'error');
         } else {
@@ -160,6 +194,7 @@ add_action('admin_init', function () {
                 'thc' => $thc,
                 'effects' => $effects,
                 'gallery' => $gallery_urls,
+                'show_in_slider' => $show_in_slider,
             ];
             manna_scout_save_strains($strains);
             add_settings_error('manna_scout', 'saved', 'Strain saved.', 'updated');
@@ -266,6 +301,15 @@ function manna_scout_add_page() {
                                 <textarea name="ms_description" id="ms_description" rows="6" class="large-text"><?php echo $editing ? esc_textarea($editing['description']) : ''; ?></textarea>
                             </td>
                         </tr>
+                        <tr>
+                            <th scope="row"><label for="ms_show_in_slider">Show in Slider</label></th>
+                            <td>
+                                <label>
+                                    <input name="ms_show_in_slider" type="checkbox" id="ms_show_in_slider" value="1" <?php echo ($editing && isset($editing['show_in_slider']) && $editing['show_in_slider']) ? 'checked' : ''; ?>>
+                                    Display this strain in the strain slider
+                                </label>
+                            </td>
+                        </tr>
                     </table>
 
                     <h3>Effects (1–10)</h3>
@@ -303,20 +347,36 @@ function manna_scout_list_page() {
         <?php if (empty($strains)): ?>
             <p>No strains yet. <a href="<?php echo esc_url(add_query_arg(['page' => 'manna-scout'], admin_url('admin.php'))); ?>">Add your first strain</a>.</p>
         <?php else: ?>
+            <form method="get" id="ms-bulk-form">
+                <input type="hidden" name="page" value="manna-scout-all" />
+                <?php wp_nonce_field('manna_scout_bulk_edit'); ?>
+                <input type="hidden" name="ms_action" value="bulk_edit_slider" />
+                <input type="hidden" name="slugs" id="ms-bulk-slugs" value="" />
+                <input type="hidden" name="value" id="ms-bulk-value" value="" />
+            </form>
+            <div style="margin-bottom: 12px;">
+                <button type="button" class="button" id="ms-bulk-select-all">Select All</button>
+                <button type="button" class="button" id="ms-bulk-deselect-all">Deselect All</button>
+                <button type="button" class="button" id="ms-bulk-enable-slider">Enable in Slider</button>
+                <button type="button" class="button" id="ms-bulk-disable-slider">Disable in Slider</button>
+            </div>
             <table class="widefat fixed striped">
                 <thead>
                     <tr>
+                        <th style="width: 30px;"><input type="checkbox" id="ms-select-all-checkbox" /></th>
                         <th>Photo</th>
                         <th>Name</th>
                         <th>Slug</th>
                         <th>Type</th>
                         <th>THC (%)</th>
+                        <th>In Slider</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($strains as $slug => $strain): ?>
                     <tr>
+                        <td><input type="checkbox" class="ms-strain-checkbox" value="<?php echo esc_attr($slug); ?>" /></td>
                         <td style="width: 80px;">
                             <?php if (!empty($strain['photo_url'])): ?>
                                 <img src="<?php echo esc_url($strain['photo_url']); ?>" style="width:60px;height:60px;object-fit:cover;border-radius:6px;" />
@@ -328,6 +388,7 @@ function manna_scout_list_page() {
                         <td><code><?php echo esc_html($strain['slug']); ?></code></td>
                         <td><?php echo esc_html(ucfirst($strain['type'])); ?></td>
                         <td><?php echo isset($strain['thc']) ? esc_html((float) $strain['thc']) : '—'; ?></td>
+                        <td><?php echo (isset($strain['show_in_slider']) && $strain['show_in_slider']) ? '✓' : '—'; ?></td>
                         <td>
                             <a class="button button-small" href="<?php echo esc_url(add_query_arg(['page' => 'manna-scout', 'strain' => $slug], admin_url('admin.php'))); ?>">Edit</a>
                             <a class="button button-small button-link-delete" href="<?php echo esc_url(wp_nonce_url(add_query_arg(['page' => 'manna-scout-all', 'ms_action' => 'delete', 'slug' => $slug], admin_url('admin.php')), 'manna_scout_delete')); ?>" onclick="return confirm('Delete this strain?');">Delete</a>
@@ -340,6 +401,7 @@ function manna_scout_list_page() {
             <h3 style="margin-top:24px;">Shortcode Usage</h3>
             <p>Use: <code>[MannaScout strains="Blue Dream, GSC"]</code> or by slugs: <code>[MannaScout slugs="blue-dream,gsc"]</code>.</p>
             <p>If no attribute is provided, all strains will be shown.</p>
+            <p>Use <code>[strain_slider]</code> to display a slider of strains marked "Show in Slider".</p>
         <?php endif; ?>
     </div>
     <?php
@@ -348,6 +410,7 @@ function manna_scout_list_page() {
 // Shortcode
 add_shortcode('MannaScout', 'manna_scout_shortcode');
 add_shortcode('manna_scout', 'manna_scout_shortcode');
+add_shortcode('strain_slider', 'manna_scout_slider_shortcode');
 
 function manna_scout_shortcode($atts): string {
     $atts = shortcode_atts([
@@ -463,6 +526,128 @@ function manna_scout_shortcode($atts): string {
     </div>
     <?php
     return (string) ob_get_clean();
+}
+
+function manna_scout_slider_shortcode($atts): string {
+    $all = manna_scout_get_all_strains();
+    
+    // Filter to only strains with show_in_slider enabled
+    $slider_strains = [];
+    foreach ($all as $slug => $strain) {
+        if (isset($strain['show_in_slider']) && $strain['show_in_slider']) {
+            $slider_strains[$slug] = $strain;
+        }
+    }
+    
+    if (empty($slider_strains)) {
+        return '<div class="manna-scout-slider-empty">No strains configured for the slider. Enable "Show in Slider" on strain edit pages.</div>';
+    }
+    
+    // Enqueue frontend assets once
+    static $enqueued = false;
+    if (!$enqueued) {
+        wp_enqueue_style('manna-scout-frontend', MANNA_SCOUT_PLUGIN_URL . 'manna-scout-frontend.css', [], '1.0.0');
+        wp_enqueue_script('manna-scout-frontend', MANNA_SCOUT_PLUGIN_URL . 'manna-scout-frontend.js', [], '1.0.0', true);
+        wp_enqueue_script('manna-scout-slider', MANNA_SCOUT_PLUGIN_URL . 'manna-scout-slider.js', [], '1.0.0', true);
+        $enqueued = true;
+    }
+    
+    $uid = 'ms-slider-' . wp_generate_uuid4();
+    
+    // Get logo from settings
+    $settings = get_option(MANNA_SCOUT_SETTINGS_KEY, []);
+    $logo_url = isset($settings['logo_url']) && !empty($settings['logo_url']) ? $settings['logo_url'] : '';
+    
+    ob_start();
+    ?>
+    <div class="manna-scout-slider" id="<?php echo esc_attr($uid); ?>">
+        <div class="ms-slider-container">
+            <button class="ms-slider-arrow ms-slider-arrow-left" aria-label="Previous strain">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="ms-slider-track">
+                <div class="ms-slider-wrapper">
+                    <?php foreach ($slider_strains as $slug => $strain): ?>
+                        <div class="ms-slider-card" data-slug="<?php echo esc_attr($slug); ?>">
+                            <?php if (!empty($strain['photo_url'])): ?>
+                                <div class="ms-slider-image-wrapper">
+                                    <img src="<?php echo esc_url($strain['photo_url']); ?>" alt="<?php echo esc_attr($strain['name']); ?>" class="ms-slider-image" />
+                                    <?php if (!empty($logo_url)): ?>
+                                        <div class="ms-slider-logo">
+                                            <img src="<?php echo esc_url($logo_url); ?>" alt="Logo" />
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                            <div class="ms-slider-name"><?php echo esc_html($strain['name']); ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <button class="ms-slider-arrow ms-slider-arrow-right" aria-label="Next strain">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="ms-slider-details">
+            <?php $first = true; foreach ($slider_strains as $slug => $strain): ?>
+                <div class="ms-slider-detail<?php echo $first ? ' active' : ''; ?>" data-slug="<?php echo esc_attr($slug); ?>">
+                    <div class="ms-slider-detail-content">
+                        <div class="ms-slider-detail-header">
+                            <h3 class="ms-slider-detail-name"><?php echo esc_html($strain['name']); ?></h3>
+                            <span class="ms-slider-type ms-slider-type--<?php echo esc_attr($strain['type']); ?>"><?php echo esc_html(ucfirst($strain['type'])); ?></span>
+                        </div>
+                        <?php if (!empty($strain['description'])): ?>
+                            <div class="ms-slider-detail-description"><?php echo wp_kses_post(wpautop($strain['description'])); ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php $first = false; endforeach; ?>
+        </div>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+}
+
+function manna_scout_settings_page() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+
+    settings_errors('manna_scout');
+    
+    $settings = get_option(MANNA_SCOUT_SETTINGS_KEY, []);
+    $logo_url = isset($settings['logo_url']) ? $settings['logo_url'] : '';
+    ?>
+    <div class="wrap">
+        <h1>MannaScout Settings</h1>
+        <form method="post">
+            <?php wp_nonce_field('manna_scout_settings'); ?>
+            <input type="hidden" name="ms_save_settings" value="1" />
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row"><label for="ms_logo_url">Slider Logo</label></th>
+                    <td>
+                        <div class="ms-photo-field">
+                            <input name="ms_logo_url" type="url" id="ms_logo_url" value="<?php echo esc_url($logo_url); ?>" class="regular-text" placeholder="https://...">
+                            <button type="button" class="button ms-select-logo">Select Image</button>
+                        </div>
+                        <p class="description">Logo image to display on the top right of each strain card in the slider. Recommended size: 100-150px wide.</p>
+                        <?php if (!empty($logo_url)): ?>
+                            <div class="ms-photo-preview" style="margin-top: 8px;">
+                                <img src="<?php echo esc_url($logo_url); ?>" style="max-width:200px;height:auto;border-radius:6px;"/>
+                            </div>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button('Save Settings'); ?>
+        </form>
+    </div>
+    <?php
 }
 
 

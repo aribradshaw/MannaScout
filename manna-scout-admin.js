@@ -15,6 +15,27 @@
       frame.open();
     });
 
+    // Media picker for logo URL
+    $('.ms-select-logo').on('click', function (e) {
+      e.preventDefault();
+      const frame = wp.media({
+        title: 'Select or Upload Logo Image',
+        button: { text: 'Use this image' },
+        multiple: false,
+      });
+      frame.on('select', function () {
+        const attachment = frame.state().get('selection').first().toJSON();
+        $('#ms_logo_url').val(attachment.url);
+        // Show preview
+        if ($('.ms-photo-preview').length === 0) {
+          $('<div class="ms-photo-preview" style="margin-top: 8px;"><img src="' + attachment.url + '" style="max-width:200px;height:auto;border-radius:6px;"/></div>').insertAfter($(this).closest('.ms-photo-field'));
+        } else {
+          $('.ms-photo-preview img').attr('src', attachment.url);
+        }
+      });
+      frame.open();
+    });
+
     // Auto-fill slug from name if empty
     const $name = $('#ms_name');
     const $slug = $('#ms_slug');
@@ -89,6 +110,51 @@
     $('.ms-clear-gallery').on('click', function () {
       writeGallery([]);
       refreshThumbs();
+    });
+
+    // Bulk edit functionality
+    $('#ms-select-all-checkbox').on('change', function () {
+      $('.ms-strain-checkbox').prop('checked', $(this).prop('checked'));
+    });
+
+    $('.ms-strain-checkbox').on('change', function () {
+      const total = $('.ms-strain-checkbox').length;
+      const checked = $('.ms-strain-checkbox:checked').length;
+      $('#ms-select-all-checkbox').prop('checked', total === checked);
+    });
+
+    $('#ms-bulk-select-all').on('click', function () {
+      $('.ms-strain-checkbox').prop('checked', true);
+      $('#ms-select-all-checkbox').prop('checked', true);
+    });
+
+    $('#ms-bulk-deselect-all').on('click', function () {
+      $('.ms-strain-checkbox').prop('checked', false);
+      $('#ms-select-all-checkbox').prop('checked', false);
+    });
+
+    $('#ms-bulk-enable-slider').on('click', function () {
+      const checked = $('.ms-strain-checkbox:checked');
+      if (checked.length === 0) {
+        alert('Please select at least one strain.');
+        return;
+      }
+      const slugs = checked.map(function () { return $(this).val(); }).get().join(',');
+      $('#ms-bulk-slugs').val(slugs);
+      $('#ms-bulk-value').val('1');
+      $('#ms-bulk-form').submit();
+    });
+
+    $('#ms-bulk-disable-slider').on('click', function () {
+      const checked = $('.ms-strain-checkbox:checked');
+      if (checked.length === 0) {
+        alert('Please select at least one strain.');
+        return;
+      }
+      const slugs = checked.map(function () { return $(this).val(); }).get().join(',');
+      $('#ms-bulk-slugs').val(slugs);
+      $('#ms-bulk-value').val('0');
+      $('#ms-bulk-form').submit();
     });
   });
 })(jQuery);
